@@ -1,7 +1,7 @@
 const express = require('express');
 const UssdMenu = require('ussd-menu-builder');
-//const queries = require('../model/firebase/queries');
-const validate_member = require('../helpers/requests');
+const listMembers = require('../helpers/requests');
+
 
 const menu = new UssdMenu();
 const router = express.Router();
@@ -36,10 +36,15 @@ menu.sessionConfig({
 //landing page
 menu.startState({
     run: function () {     
-       // console.log("hello"); 
-        let response = validate_member("254727991654")
+       // let user = req.body.phoneNumber;
+        let response = listMembers()
             .then(result => {
-                let { positions } = result;
+                let i = 0;
+                let positions = [];
+                for (i = 0; i < result.data.length; i++) {
+                    positions.push(result.data[i].phone);
+                }   
+               
                 let currentMenu = [];
                 let posts = "";
                 let indexOfLastElement = 0;
@@ -79,9 +84,8 @@ menu.startState({
             })
         //displaying result to phoneNumber
         response.then(result => {
-            menu.con(`Welcome ${menu.args.userName}` +
-                `\nSelect an Office` +
-                result);
+            menu.con(`Welcome ${menu.args.userName}  \nSelect phone number  ${result}`);              
+               
         }).catch(error => {
             if (error) console.log("Error", error)
         })
@@ -108,7 +112,6 @@ router.post('*', async (req, res) => {
         text: text,
         userName: userName
     };
-    console.log(args);
     let resMsg = await menu.run(args);
     res.send(resMsg);
 });

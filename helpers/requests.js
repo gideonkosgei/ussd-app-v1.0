@@ -1,26 +1,27 @@
+
 const axios = require('axios');
+const endpoint_validate_member  = require('../configs/endpoints');
 
-// user Authentication  
-const validate_member =  function (config,msisdn) {     
-    const data = {
-      phone_number:msisdn   
-    };
-    const options = {
-      url: config.url,
-      method: config.method,
-      headers: config.headers,   
-      params: data
-    }
+const options = {
+    url: endpoint_validate_member.url,
+    method: endpoint_validate_member.method,
+    headers: endpoint_validate_member.headers   
+    //params: data
+  }
 
+
+let listMembers = function(){  
     return new Promise((resolve, reject) => {
-      axios(options).then(res => {        
-          resolve(res.data);
-      }).catch(err => reject(err));
-  });       
-}
+      axios(options)
+      .then(res => {        
+          resolve(res);
+      })
+      .catch(err => reject(err));
+  });  
+   
+};
 
-module.exports = validate_member;
-
+module.exports = listMembers;
 
 
 
