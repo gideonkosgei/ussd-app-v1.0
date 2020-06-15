@@ -12,6 +12,7 @@ const options = {
 
 let validateMember = function(req, res, next){ 
    let user = req.body.phoneNumber;
+   console.log(user);
    let mobileNumber = [];
    let i = 0;
    return  axios(options)

@@ -31,6 +31,8 @@ menu.sessionConfig({
         let value = sessions[sessionId][key];
         callback(null, value);
     }
+
+    
 });
 
 //landing page
@@ -84,7 +86,9 @@ menu.startState({
             })
         //displaying result to phoneNumber
         response.then(result => {
-            menu.con(`Welcome ${menu.args.userName}  \nSelect phone number  ${result}`);              
+           // menu.con(`Welcome ${menu.args.userName}  \nSelect phone number  ${result}`);   
+            menu.con(`Dear Gideon, Welcome to SACCO Platform ,Please enter PIN to proceed`);             
+            
                
         }).catch(error => {
             if (error) console.log("Error", error)
@@ -104,7 +108,8 @@ menu.on('error', err => {
 });
 
 router.post('*', async (req, res) => {  
-    const {phoneNumber,sessionId,serviceCode,text,userName}=   req.body;    
+    const {phoneNumber,sessionId,serviceCode,text,userName}=   req.body;   
+    console.log(phoneNumber); 
     let args = {
         phoneNumber: phoneNumber,
         sessionId: sessionId,
