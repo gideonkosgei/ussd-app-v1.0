@@ -78,7 +78,7 @@ menu.startState({
     }
 });
 
-//handling user authentication
+//handle user authentication & Display main menu is authentication is successful
 menu.state('authenticate_user', {
     run:  () => {
         const pin = menu.val;
@@ -87,15 +87,16 @@ menu.state('authenticate_user', {
 
         authenticate_user(phone_number,pin)
         .then((results) => { 
-            const bearer_token  = results.token;
-            menu.session.set('bearer_token', bearer_token)
+            const bearer_token  = results.token;  
+            // store the bearer token in session & display main menu                     
+            menu.session.set('bearer_token', bearer_token)            
             .then( () => {
                 menu.con('Main Menu. Choose option:' +
                 '\n1. Check balances'+
                 '\n2. Check loan eligibility'+
                 '\n3. M-pesa'+
                 '\n4. Loans'+
-                '\n000. logout'       
+                '\n\n000. logout'       
                 ); 
             });   
         }).catch(error => {             
@@ -110,6 +111,29 @@ menu.state('authenticate_user', {
         '4': 'loans',
         '000': 'logout'
     }
+});
+
+//handle user balances
+menu.state('check_balances', {
+    run:  () => { 
+        // get bearer token from sessions
+        let bearer_token = '';
+        menu.session.get('bearer_token')
+        .then( token => {           
+            bearer_token = token; 
+        });
+
+        menu.con('Check Balances:' +
+                '\n0. Back'+
+                '\n00. Home'+
+                '\n000. Logout'                       
+                ); 
+        },
+        next: {           
+            '0': 'Back',
+            '00': 'Home',
+            '000': 'Logout'
+        }
 });
 
 menu.on('error', err => {
