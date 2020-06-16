@@ -7,45 +7,22 @@ const authenticate_user = require('../helpers/authenticate');
 
 let sessions = {};
 //session configurations
-menu.sessionConfig({   
-    start: (sessionId, callback) => {
-        // initialize current session if it doesn't exist
-        // this is called by menu.run()
-        if (!(sessionId in sessions)) sessions[sessionId] = {};
-        callback();
-    },
-    end: (sessionId, callback) => {
-        // clear current session
-        // this is called by menu.end()
-        delete sessions[sessionId];
-        callback();
-    },
-    set: (sessionId, key, value, callback) => {
-        // store key-value pair in current session
-        sessions[sessionId][key] = value;
-        callback();
-    },
-    get: (sessionId, key, callback) => {
-        // retrieve value by key in current session
-        let value = sessions[sessionId][key];
-        callback(null, value);
-    }
-
-    /*start: function(sessionId){
+menu.sessionConfig({
+    start: (sessionId) => {
         return new Promise((resolve, reject) => {
             if (!(sessionId in sessions)) sessions[sessionId] = {};
             resolve();
         });
     },
 
-    end: function(sessionId, ){
+    end: (sessionId) => {
         return new Promise((resolve, reject) => {
             delete sessions[sessionId];
             resolve();
         });
     },
     
-    set: function(sessionId, key, value){
+    set: (sessionId, key, value) => {
         return new Promise((resolve, reject) => {
             sessions[sessionId][key] = value;
             resolve();
@@ -53,12 +30,12 @@ menu.sessionConfig({
     },
    
     // retrieve value by key in current session
-    get: function(sessionId, key){
+    get: (sessionId, key) => {
         return new Promise((resolve, reject) => {
             let value = sessions[sessionId][key];
             resolve(value);
         });
-    }*/
+    }
 });
 
 //landing page
@@ -120,7 +97,7 @@ menu.state('check_balances', {
         let bearer_token = '';
         menu.session.get('bearer_token')
         .then( token => {           
-            bearer_token = token; 
+            bearer_token = token;             
         });
 
         menu.con('Check Balances:' +
