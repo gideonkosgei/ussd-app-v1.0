@@ -1,27 +1,30 @@
 
 const axios = require('axios');
-const endpoint_validate_member  = require('../configs/endpoints');
+const endpoints  = require('../configs/endpoints');
 
-const options = {
-    url: endpoint_validate_member.url,
-    method: endpoint_validate_member.method,
-    headers: endpoint_validate_member.headers   
-    //params: data
-  }
+let getUserDetails = function(phone_number){  
+  const body = {
+    phone_number:phone_number       
+  };   
 
+    const options = {
+        url: endpoints.endpoint_validate_user.url,
+        method: endpoints.endpoint_validate_user.method,
+        headers: endpoints.endpoint_validate_user.headers,  
+        data: body
+    };    
 
-let listMembers = function(){  
     return new Promise((resolve, reject) => {
       axios(options)
       .then(res => {        
-          resolve(res);
+          resolve(res.data);
       })
       .catch(err => reject(err));
   });  
    
 };
 
-module.exports = listMembers;
+module.exports = getUserDetails;
 
 
 

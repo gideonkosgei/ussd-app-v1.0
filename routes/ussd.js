@@ -1,14 +1,13 @@
 const express = require('express');
 const UssdMenu = require('ussd-menu-builder');
-const listMembers = require('../helpers/requests');
-
-
 const menu = new UssdMenu();
 const router = express.Router();
+const getUserDetails = require('../helpers/requests');
+const authenticate_user = require('../helpers/authenticate');
 
 let sessions = {};
 //session configurations
-menu.sessionConfig({
+menu.sessionConfig({   
     start: (sessionId, callback) => {
         // initialize current session if it doesn't exist
         // this is called by menu.run()
@@ -32,93 +31,101 @@ menu.sessionConfig({
         callback(null, value);
     }
 
+    /*start: function(sessionId){
+        return new Promise((resolve, reject) => {
+            if (!(sessionId in sessions)) sessions[sessionId] = {};
+            resolve();
+        });
+    },
+
+    end: function(sessionId, ){
+        return new Promise((resolve, reject) => {
+            delete sessions[sessionId];
+            resolve();
+        });
+    },
     
+    set: function(sessionId, key, value){
+        return new Promise((resolve, reject) => {
+            sessions[sessionId][key] = value;
+            resolve();
+        });
+    },
+   
+    // retrieve value by key in current session
+    get: function(sessionId, key){
+        return new Promise((resolve, reject) => {
+            let value = sessions[sessionId][key];
+            resolve(value);
+        });
+    }*/
 });
 
 //landing page
 menu.startState({
-    run: function () {     
-       // let user = req.body.phoneNumber;
-        let response = listMembers()
-            .then(result => {
-                let i = 0;
-                let positions = [];
-                for (i = 0; i < result.data.length; i++) {
-                    positions.push(result.data[i].phone);
-                }   
-               
-                let currentMenu = [];
-                let posts = "";
-                let indexOfLastElement = 0;
-                //persisting positions throughout the session
-                menu.session.set('positions', positions)
-                    .then(() => {
-                        return positions
-                    }).catch(error => {
-                        if (error) console.log("Error", error)
-                    })
-                //selecting positions to display to phoneNumber    
-                for (let index = 0; index < 7; index++) {
-                    posts += `\n${index + 1}. ${positions[index]}`
-                    indexOfLastElement++;
-                    //persisting content of page to be diplayed to phoneNumber 
-                    menu.session.set('currentMenu', currentMenu)
-                        .then(() => {
-                            currentMenu.push(positions[index]);
-                        }).catch(error => {
-                            if (error) console.log("Error", error)
-                        })
-                }
-                if (positions.length > currentMenu.length) {
-                    posts += `\n99. next`;
-                }
-                //index of the last element selected
-                menu.session.set('indexOfLastElement', indexOfLastElement)
-                    .then(() => {
-                        return indexOfLastElement
-                    }).catch(error => {
-                        if (error) console.log("Error", error)
-                    })
-                return posts
-            })
-            .catch(error => {
-                if (error) console.log("Error", error)
-            })
-        //displaying result to phoneNumber
-        response.then(result => {
-           // menu.con(`Welcome ${menu.args.userName}  \nSelect phone number  ${result}`);   
-            menu.con(`Dear Gideon, Welcome to SACCO Platform ,Please enter PIN to proceed`);             
-            
-               
-        }).catch(error => {
-            if (error) console.log("Error", error)
-        })
+    run:  () => {  
+        getUserDetails(menu.args.phoneNumber)
+        .then(results => {
+            const user = results.name.toUpperCase();            
+            menu.con(`Dear ${user}, Welcome to Tritel SACCO. Enter PIN To Proceed`);  
+        }).catch(error => {  
+            console.log(error.message)
+            menu.end('Request failed.Contact customer care');
+        }); 
     },
     next: {
-        '*^[1-7]$': 'getContestants',
-        '99': 'getNextPosition',
+        '*\\d+': 'authenticate_user'    
     }
 });
 
+//handling user authentication
+menu.state('authenticate_user', {
+    run:  () => {
+        const pin = menu.val;
+        //const phone_number =menu.args.phoneNumber;
+        const phone_number = "+254786991654";     
 
+        authenticate_user(phone_number,pin)
+        .then((results) => { 
+            const bearer_token  = results.token;
+            menu.session.set('bearer_token', bearer_token)
+            .then( () => {
+                menu.con('Main Menu. Choose option:' +
+                '\n1. Check balances'+
+                '\n2. Check loan eligibility'+
+                '\n3. M-pesa'+
+                '\n4. Loans'+
+                '\n000. logout'       
+                ); 
+            });   
+        }).catch(error => {             
+            menu.end('Wrong PIN. Try Again!');
+            console.log(error.message);
+        }); 
+    },
+    next: {  
+        '1': 'check_balances',
+        '2': 'check_loan_eligibility',
+        '3': 'M-pesa', 
+        '4': 'loans',
+        '000': 'logout'
+    }
+});
 
 menu.on('error', err => {
     // handle errors
     console.log(err);
 });
 
-router.post('*', async (req, res) => {  
-    const {phoneNumber,sessionId,serviceCode,text,userName}=   req.body;   
-    console.log(phoneNumber); 
+router.post('*', async (req, res) => {    
+    const {phoneNumber,sessionId,serviceCode,text}=   req.body; 
     let args = {
         phoneNumber: phoneNumber,
         sessionId: sessionId,
         serviceCode: serviceCode,
-        text: text,
-        userName: userName
+        text: text        
     };
-    let resMsg = await menu.run(args);
-    res.send(resMsg);
+        let resMsg = await menu.run(args);
+        res.send(resMsg); 
 });
-
 module.exports = router;

@@ -1,25 +1,36 @@
-//validating if user is accredited to vote
-const queries = require('../model/firebase/queries')
+const axios = require('axios');
+const endpoints  = require('../configs/endpoints');
 
-let validateUser = function(req, res, next){
-    let user = req.body.phoneNumber;
-    let mobileNumber = [];
-   return queries.getDoc("faculty of science",'accredited voters')
-        .then(result => {
-            for(mobile in result){
-                mobileNumber.push(mobile);
-            }
-             let validUser = mobileNumber.includes(user);
-             if(validUser){
-                 req.body.user = result[user].name
-                 
-                 next()
-             }else{
-                 res.send(`END You are not a registered voter`)
-             }
+
+
+let validateUser = function(req, res, next){ 
+    const body = {
+        phone_number:req.body.phoneNumber        
+      };    
+   
+    const options = {
+        url: endpoints.endpoint_validate_user.url,
+        method: endpoints.endpoint_validate_user.method,
+        headers: endpoints.endpoint_validate_user.headers,  
+        data: body
+      };  
+      
+   return  axios(options)
+        .then(results => {  
+            if(!results.data.exist){                        
+                res.send(`END You are not a registered member!`);  
+            }else if (!results.data.active){
+                res.send(`END You are not an active member!`);
+            } else{ 
+                next();
+            }  
         }).catch(error => {
-            console.log("Error",error)
+            const generic_message = 'Request failed.Contact customer care';
+            res.send(`END ${generic_message}`);
+            console.log(error.message)
         })
 };
-
 module.exports = validateUser;
+
+
+
