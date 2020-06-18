@@ -4,6 +4,9 @@ const menu = new UssdMenu();
 const router = express.Router();
 const getUserDetails = require('../helpers/requests');
 const authenticate_user = require('../helpers/authenticate');
+const get_eligibility_status = require('../helpers/get_eligibility_status');
+const get_balances = require('../helpers/get_balances');
+
 
 let sessions = {};
 //session configurations
@@ -14,22 +17,18 @@ menu.sessionConfig({
             resolve();
         });
     },
-
     end: (sessionId) => {
         return new Promise((resolve, reject) => {
             delete sessions[sessionId];
             resolve();
         });
-    },
-    
+    },    
     set: (sessionId, key, value) => {
         return new Promise((resolve, reject) => {
             sessions[sessionId][key] = value;
             resolve();
         });
     },
-   
-    // retrieve value by key in current session
     get: (sessionId, key) => {
         return new Promise((resolve, reject) => {
             let value = sessions[sessionId][key];
@@ -38,7 +37,7 @@ menu.sessionConfig({
     }
 });
 
-//landing page
+//index & password input menu
 menu.startState({
     run:  () => {  
         getUserDetails(menu.args.phoneNumber)
@@ -47,75 +46,123 @@ menu.startState({
             menu.con(`Dear ${user}, Welcome to Tritel SACCO. Enter PIN To Proceed`);  
         }).catch(error => {  
             console.log(error.message)
-            menu.end('Request failed.Contact customer care');
+            menu.end('Request failed!');
         }); 
     },
     next: {
-        '*\\d+': 'authenticate_user'    
+        '*\\d+': 'home'    
     }
 });
 
-//handle user authentication & Display main menu is authentication is successful
-menu.state('authenticate_user', {
+//handle user authentication & Display main menu if authentication is successful
+menu.state('home', {
     run:  () => {
-        const pin = menu.val;
+        const pin = menu.val;       
         //const phone_number =menu.args.phoneNumber;
-        const phone_number = "+254786991654";     
-
-        authenticate_user(phone_number,pin)
-        .then((results) => { 
-            const bearer_token  = results.token;  
-            // store the bearer token in session & display main menu                     
-            menu.session.set('bearer_token', bearer_token)            
-            .then( () => {
-                menu.con('Main Menu. Choose option:' +
-                '\n1. Check balances'+
-                '\n2. Check loan eligibility'+
-                '\n3. M-pesa'+
-                '\n4. Loans'+
-                '\n\n000. logout'       
-                ); 
-            });   
-        }).catch(error => {             
-            menu.end('Wrong PIN. Try Again!');
-            console.log(error.message);
-        }); 
+        const phone_number = "+254786991654";         
+        const main_menu_options = 
+            'Main Menu. Choose option:' +
+            '\n1. Check balances'+
+            '\n2. Check loan eligibility'+
+            '\n3. M-pesa'+
+            '\n4. Loans'+
+            '\n\n000. logout'             
+        /* 
+            Need to check if the user is authenticated 
+            The user my be returning home from menus down the hierarchy
+         */        
+        menu.session.get('bearer_token')
+        .then( token => { 
+            //if the token is set, authenticate 
+            if (typeof token === 'undefined'){
+                authenticate_user(phone_number,pin)
+                .then((results) => { 
+                    const bearer_token  = results.token;  
+                    // store the bearer token in session & display main menu 
+                    menu.session.set('bearer_token', bearer_token)            
+                    .then( () => {
+                        menu.con(main_menu_options );                 
+                    });   
+                }).catch(error => {             
+                    menu.end('Wrong PIN. Try Again!');
+                    console.log(error.message);
+                });  
+            } else {
+                menu.con(main_menu_options );
+            }        
+        });        
     },
     next: {  
         '1': 'check_balances',
         '2': 'check_loan_eligibility',
         '3': 'M-pesa', 
         '4': 'loans',
-        '000': 'logout'
+        '000': '__start__'
     }
 });
 
 //handle user balances
 menu.state('check_balances', {
     run:  () => { 
-        // get bearer token from sessions
-        let bearer_token = '';
+        // get bearer token from sessions              
         menu.session.get('bearer_token')
-        .then( token => {           
-            bearer_token = token;             
-        });
+        .then( token => {
+            get_balances(token)
+            .then((results) => {  
+                const deposits = results.current_deposits.toLocaleString('en');
+                const loans = results.current_loan.toLocaleString('en');
+                const savings = results.current_savings.toLocaleString('en');
+                const shares = results.current_shares.toLocaleString('en');
+                const unallocated = results.current_unallocated.toLocaleString('en'); 
 
-        menu.con('Check Balances:' +
-                '\n0. Back'+
-                '\n00. Home'+
-                '\n000. Logout'                       
+                const resp = `\n Deposits : ${deposits}\n Loans : ${loans} \n Savings : ${savings} \n Shares : ${shares}\n Unallocated : ${unallocated}`;
+                               
+                menu.con(
+                    `My Balances: ${resp} 
+                    \n0. Back `
                 ); 
+            }).catch(error => {             
+                menu.end('Request failed!');
+                console.log(error.message);
+            });        
+        });
+        
         },
         next: {           
-            '0': 'Back',
-            '00': 'Home',
-            '000': 'Logout'
+            '0': 'home'                      
         }
 });
 
-menu.on('error', err => {
-    // handle errors
-    console.log(err);
+//handle member eligibility status
+menu.state('check_loan_eligibility', {
+    run:  () => {         
+        // get bearer token from sessions              
+        menu.session.get('bearer_token')
+        .then( token => {
+            get_eligibility_status(token)
+            .then((results) => {            
+                const data =JSON.parse(results.loan_calculator); 
+                statuses = '';  
+                data.map((res)=>{ 
+                    statuses = `${statuses}\n${res.loan_product_name} : ${res.amount.toLocaleString('en')}`;
+                });                
+                menu.con(
+                    `Max Eligible Amount: ${statuses} 
+                    \n0. Back `
+                ); 
+            }).catch(error => {             
+                menu.end('Request failed!');
+                console.log(error.message);
+            });        
+        });
+    },
+    next: {           
+        '0': 'home'   
+    }
+});
+
+menu.on('error', err => {   
+    console.log(err); // handle errors
 });
 
 router.post('*', async (req, res) => {    

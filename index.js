@@ -10,8 +10,8 @@ const app = express();
 app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
 app.use('*',validateUser,ussdRoutes);
+
 app.listen(port,()=>{
     console.log('Server is listening on ',port);
 });
