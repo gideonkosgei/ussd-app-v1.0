@@ -58,8 +58,8 @@ menu.startState({
 menu.state('home', {
     run:  () => {
         const pin = menu.val;       
-        //const phone_number =menu.args.phoneNumber;
-        const phone_number = "+254786991654";         
+        const phone_number =menu.args.phoneNumber;
+        //const phone_number = "+254786991654"; 
         const main_menu_options = 
             'Main Menu. Choose option:' +
             '\n1. Check balances'+
@@ -141,7 +141,7 @@ menu.state('check_loan_eligibility', {
         .then( token => {
             get_eligibility_status(token)
             .then((results) => {            
-                const data =JSON.parse(results.loan_calculator); 
+                const data =JSON.parse(results.loan_calculator);               
                 statuses = '';  
                 data.map((res)=>{ 
                     statuses = `${statuses}\n${res.loan_product_name} : ${res.amount.toLocaleString('en')}`;
@@ -160,6 +160,149 @@ menu.state('check_loan_eligibility', {
         '0': 'home'   
     }
 });
+
+
+//handle loans Menu
+menu.state('loans', {
+    run:  () => {         
+        // get bearer token from sessions              
+        menu.session.get('bearer_token')
+        .then( token => {
+            const loans_menu_options = 
+            'Loans Menu. Choose option:' +
+            '\n1. Request Loan'+
+            '\n2. Repay Loan'+
+            '\n3. Check Loan Status'+            
+            '\n\n0. back';
+
+            menu.con(loans_menu_options ); 
+        });
+        
+    },
+    next: { 
+        '1': 'request_loan',
+        '2': 'repay_loan',
+        '3': 'check_loan_status',      
+        '0': 'home'   
+    }
+});
+
+//handle loan request
+menu.state('request_loan', {
+    run:  () => {    
+        menu.session.get('bearer_token')
+        .then( token => {
+            get_eligibility_status(token)
+            .then((results) => {            
+                const data =JSON.parse(results.loan_calculator);
+                console.log(data); 
+                loans = ''; 
+                
+                let counter = 1;
+                data.map((res)=>{ 
+                    loans = `${loans}\n ${counter}. ${res.loan_product_name}`;
+                    counter = counter + 1;
+                });                
+                menu.con(
+                    `Select Loan: ${loans}`+ 
+                    '\n\n0. Back'+
+                    '\n00. Home'
+                ); 
+            }).catch(error => {             
+                menu.end('Request failed!');
+                console.log(error.message);
+            });        
+        });
+    },
+    next: {
+        '*\\d+': 'loan_request_amount',           
+        '0': 'Back',
+        '00': 'home',   
+    }
+});
+
+//handle loan_request_amount
+menu.state('loan_request_amount', {
+    run:  () => {    
+        menu.session.get('bearer_token')
+        .then( token => {
+
+                menu.con(
+                    'Enter Amount (Max: xxxxxxx):'+                    
+                    '\n\n0. Back'+
+                    '\n00. Home'
+                );                   
+        });
+    },
+    next: {
+        '*\\d+': 'loan_request_term',            
+        '0': 'Back',
+        '00': 'home',   
+    }
+});
+
+//handle loan_request_term
+menu.state('loan_request_term', {
+    run:  () => {    
+        menu.session.get('bearer_token')
+        .then( token => {
+                menu.con(
+                    'Enter Loan Term (Months):'+                   
+                    '\n\n0. Back'+
+                    '\n00. Home'
+                );                   
+        });
+    },
+    next: {
+        '*\\d+': 'loan_request_finalize',            
+        '0': 'Back',
+        '00': 'home',   
+    }
+});
+
+//handle loan_request_term
+menu.state('loan_request_finalize', {
+    run:  () => {    
+        menu.session.get('bearer_token')
+        .then( token => {
+                menu.con(
+                    'Loan Details Confirmation:'+  
+                    '\nLoan Name : Development'+
+                    '\nLoan Amount: 40,000'+                 
+                    '\nLoan Term: 12 Months'+
+                    '\n\n1. finish'+
+                    '\n0. Back'+
+                    '\n00. Home'
+                );                   
+        });
+    },
+    next: {
+        '*\\d+': 'loan_request_done',            
+        '0': 'Back',
+        '00': 'home',   
+    }
+});
+
+
+//handle loan_request_term
+menu.state('loan_request_done', {
+    run:  () => {    
+        menu.session.get('bearer_token')
+        .then( token => {
+                menu.con(
+                    'Loan Application Completed Successfully!'+
+                    '\n\n1. Check Loan status'+ 
+                    '\n00. Home'                     
+                );                   
+        });
+    },
+    next: { 
+        '1': 'Check Loan status', 
+        '00': 'home',     
+    }
+});
+
+
 
 menu.on('error', err => {   
     console.log(err); // handle errors
