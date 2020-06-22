@@ -6,6 +6,7 @@ const getUserDetails = require('../helpers/requests');
 const authenticate_user = require('../helpers/authenticate');
 const get_eligibility_status = require('../helpers/get_eligibility_status');
 const get_balances = require('../helpers/get_balances');
+const get_loans = require('../helpers/get_loans');
 
 
 let sessions = {};
@@ -172,7 +173,8 @@ menu.state('loans', {
             'Loans Menu. Choose option:' +
             '\n1. Request Loan'+
             '\n2. Repay Loan'+
-            '\n3. Check Loan Status'+            
+            '\n3. Check Loan Status'+ 
+            '\n4. Loan Balances'+            
             '\n\n0. back';
 
             menu.con(loans_menu_options ); 
@@ -182,7 +184,8 @@ menu.state('loans', {
     next: { 
         '1': 'request_loan',
         '2': 'repay_loan',
-        '3': 'check_loan_status',      
+        '3': 'check_loan_status',
+        '4': 'loan_balances',   
         '0': 'home'   
     }
 });
@@ -194,8 +197,7 @@ menu.state('request_loan', {
         .then( token => {
             get_eligibility_status(token)
             .then((results) => {            
-                const data =JSON.parse(results.loan_calculator);
-                console.log(data); 
+                const data =JSON.parse(results.loan_calculator);               
                 loans = ''; 
                 
                 let counter = 1;
@@ -247,7 +249,7 @@ menu.state('loan_request_term', {
         menu.session.get('bearer_token')
         .then( token => {
                 menu.con(
-                    'Enter Loan Term (Months):'+                   
+                    'Enter Loan Term(months):'+                   
                     '\n\n0. Back'+
                     '\n00. Home'
                 );                   
@@ -297,8 +299,99 @@ menu.state('loan_request_done', {
         });
     },
     next: { 
-        '1': 'Check Loan status', 
+        '1': 'check_loan_status', 
         '00': 'home',     
+    }
+});
+
+
+//handle member loan Balances
+menu.state('loan_balances', {
+    run:  () => {   
+        menu.session.get('bearer_token')
+        .then( token => {
+            get_loans(token)
+            .then((results) => {  
+                 balances = '';  
+                 results.map((res)=>{ 
+                     if (res.loan_balance > 0) {
+                        balances = `${balances}\n${res.loan_product_type[1]} : ${res.loan_balance.toLocaleString('en')}`;                
+                     }
+                   });
+                menu.con(
+                    `Loan Balances: ${balances}
+                    \n0. Back
+                     00. Home `
+                ); 
+            }).catch(error => {             
+                menu.end('Request failed!');
+                console.log(error.message);
+            });        
+        });
+    },
+    next: {           
+        '0': 'loans',
+        '00': 'home'   
+    }
+});
+
+//handle member loan Balances
+menu.state('loan_balances', {
+    run:  () => {   
+        menu.session.get('bearer_token')
+        .then( token => {
+            get_loans(token)
+            .then((results) => {  
+                 balances = '';  
+                 results.map((res)=>{ 
+                     if (res.loan_balance > 0) {
+                        balances = `${balances}\n${res.loan_product_type[1]} : ${res.loan_balance.toLocaleString('en')}`;                
+                     }
+                   });
+                menu.con(
+                    `Loan Balances: ${balances}
+                    \n0. Back
+                     00. Home `
+                ); 
+            }).catch(error => {             
+                menu.end('Request failed!');
+                console.log(error.message);
+            });        
+        });
+    },
+    next: {           
+        '0': 'loans',
+        '00': 'home'   
+    }
+});
+
+//handle member loan statuses
+menu.state('check_loan_status', {
+    run:  () => {   
+        menu.session.get('bearer_token')
+        .then( token => {
+            get_loans(token)
+            .then((results) => {  
+                 balances = '';  
+                 results.map((res)=>{ 
+                     if (res.loan_balance > 0) {
+                        balances = `${balances}\n${res.loan_product_type[1]} : ${res.state}`;                
+                     }
+                   });
+                menu.con(
+                    `Loan Statuses: ${balances}
+                    \n0. Back
+                     00. Home `
+                ); 
+            }).catch(error => {             
+                menu.end('Request failed!');
+                console.log(error.message);
+            });        
+        });
+    },
+    next: {           
+        '0': 'loans',
+        '00': 'home'   
     }
 });
 
