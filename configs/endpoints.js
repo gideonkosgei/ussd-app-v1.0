@@ -35,11 +35,19 @@ const endpoint_loans = {
   headers: api_configs.headers   
 }; 
 
+//get loan products
+const endpoint_loan_products = {
+  url: `${api_configs.api}/GetLoanProducts`,
+  method: 'GET',
+  headers: api_configs.headers   
+}; 
+
 module.exports = {
   endpoint_validate_user,
   endpoint_authenticate_user,
   endpoint_eligibility_status,
   endpoint_balances,
-  endpoint_loans
+  endpoint_loans,
+  endpoint_loan_products
 }
  
