@@ -8,10 +8,11 @@ const get_eligibility_status = require('../helpers/get_eligibility_status');
 const get_balances = require('../helpers/get_balances');
 const get_loans = require('../helpers/get_loans');
 const get_loan_products = require('../helpers/get_loan_products');
+const get_loan_pre_computation = require('../helpers/get_loan_pre_computation');
+const post_loan_request = require('../helpers/post_loan_request');
 
-
-let sessions = {};
 //session configurations
+let sessions = {};
 menu.sessionConfig({
     start: (sessionId) => {
         return new Promise((resolve, reject) => {
@@ -60,8 +61,7 @@ menu.startState({
 menu.state('home', {
     run:  () => {
         const pin = menu.val;       
-        const phone_number =menu.args.phoneNumber;
-        //const phone_number = "+254786991654"; 
+        const phone_number =menu.args.phoneNumber;       
         const main_menu_options = 
             'Main Menu. Choose option:' +
             '\n1. Check balances'+
@@ -191,11 +191,10 @@ menu.state('loans', {
         '0': 'home'   
     }
 });
-//request_loan
+
 //handle loan categories
 menu.state('loan_categories', {
-    run:  () => {   
-        
+    run:  () => {        
         
         menu.con(
             'Select Loan Category:'+
@@ -206,7 +205,7 @@ menu.state('loan_categories', {
         ); 
     },
     next: {
-        '*\\d+': 'request_loan',           
+        '*\\d+': 'loan_request_show_loans',           
         '0': 'loans',
         '00': 'home',   
     }
@@ -228,119 +227,220 @@ menu.state('loan_terms_categories', {
         '00': 'home',   
     }
 });
-//handle loan request
-menu.state('request_loan', {
-    run:  () => {    
+
+
+
+
+
+//handle loan listing based on categ for loan request
+menu.state('loan_request_show_loans', {
+    run:  () => { 
+     function show_loans(category){
         menu.session.get('bearer_token')
         .then( token => {
             get_eligibility_status(token)
-            .then((results) => {            
-                const data =JSON.parse(results.loan_calculator);               
-                loans = '';                 
-                let counter = 1;
-                data.map((res)=>{ 
-                    loans = `${loans}\n ${counter}. ${res.loan_product_name}`;
-                    counter = counter + 1;
-                });                
+            .then((results) => {                      
+                loans = ''; 
+                let eligibility_properties =[];                
+                let counter = 1; 
+                let data ={}
+                const categorised_loans = JSON.parse(results.loan_calculator).filter(res => res.loan_category === category); 
+                categorised_loans.map((res)=>{ 
+                    loans = `${loans}\n ${counter}. ${res.loan_product_name}`;                     
+                    data = {"id":counter,"loan_product_id":res.loan_product_id,"loan_product_name":res.loan_product_name,"max_amount":res.amount};
+                    eligibility_properties.push(data);                   
+                    counter = counter + 1;                 
+                  });                 
+                menu.session.set('eligibility_properties', eligibility_properties)            
+                .then( () => {
                 menu.con(
-                    `Select Loan: ${loans}`+ 
+                    `Select Loan:${loans}`+ 
                     '\n\n0. Back'+
                     '\n00. Home'
-                ); 
-            }).catch(error => {             
+                    );                 
+                });                  
+                         
+                
+            }).catch(error => {             e
                 menu.end('Request failed!');
                 console.log(error.message);
             });        
         });
+     }
+     
+    const category = (menu.val === '1')? 'mobile' : (menu.val === '2')? 'term' : 'undefined';
+    if (category === 'mobile' || category === 'term'){
+        menu.session.set('loan_request_category', category)            
+            .then( () => {
+                show_loans(category);          
+            });  
+    } else {
+        menu.session.get('loan_request_category')
+        .then( categ => {       
+            show_loans(categ); 
+        }); 
+    }     
     },
     next: {
         '*\\d+': 'loan_request_amount',           
-        '0': 'Back',
+        '0': 'loan_terms_categories',
         '00': 'home',   
     }
 });
 
+
 //handle loan_request_amount
 menu.state('loan_request_amount', {
-    run:  () => {    
-        menu.session.get('bearer_token')
-        .then( token => {
+    run:  () => { 
+        menu.session.get('eligibility_properties')
+        .then( loans => {
+            menu.session.get('loan_details')            
+            .then( details => {                
+                const loan_selected = (typeof details==='undefined') ? menu.val:  (typeof details==='object' && menu.val !== '0') ? menu.val: details.loan_selected;           
+                const loan_terms_filtered = loans.filter(res => res.id === parseInt(loan_selected)); 
+                const loan_details = {"loan_selected":loan_selected,"loan_product_id":loan_terms_filtered[0].loan_product_id,"loan_product_name":loan_terms_filtered[0].loan_product_name,"max_amount":loan_terms_filtered[0].max_amount} ;             
+                menu.session.set('loan_details', loan_details)            
+                .then( () => {                
+                    menu.con(
+                        `Enter Amount (Max: ${Math.floor(loan_terms_filtered[0].max_amount).toLocaleString('en')}):`+                    
+                        '\n\n0. Back'+
+                        '\n00. Home'
+                    );     
+                });               
 
-                menu.con(
-                    'Enter Amount (Max: xxxxxxx):'+                    
-                    '\n\n0. Back'+
-                    '\n00. Home'
-                );                   
+            }
+            );                              
         });
     },
     next: {
         '*\\d+': 'loan_request_term',            
-        '0': 'Back',
+        '0': 'loan_request_show_loans',
         '00': 'home',   
     }
 });
 
 //handle loan_request_term
 menu.state('loan_request_term', {
-    run:  () => {    
-        menu.session.get('bearer_token')
-        .then( token => {
-                menu.con(
-                    'Enter Loan Term(months):'+                   
-                    '\n\n0. Back'+
-                    '\n00. Home'
-                );                   
-        });
+    run:  () => {
+        const loan_amount = menu.val ;
+        menu.session.set('loan_amount', loan_amount)            
+            .then( () => { 
+                menu.session.get('loan_details')
+                .then( loan_props => {                    
+                    const msg = (loan_amount>loan_props.max_amount) ? `Invalid Amount! \nMax Amount: ${loan_props.max_amount} \nRequested Amount: ${loan_amount} \n\n0. Back \n00. Home ` :'Enter Loan Term(months):\n\n0. Back \n00. Home' ;
+                    menu.con(                                       
+                       `${msg}`                        
+                    );
+
+                }
+                );               
+                     
+            }); 
     },
     next: {
-        '*\\d+': 'loan_request_finalize',            
-        '0': 'Back',
+        '*\\d+': 'loan_details_confirmation',            
+        '0': 'loan_request_amount',
         '00': 'home',   
     }
 });
+
+//handle loan_details_confirmation
+menu.state('loan_details_confirmation', {
+    run:  () => { 
+        const loan_term = menu.val ;
+        menu.session.set('loan_term', loan_term)            
+            .then( () => {
+                menu.session.get('bearer_token')
+                    .then( token => {
+                        menu.session.get('loan_details')
+                        .then( loan_details => {
+                            menu.session.get('loan_amount')
+                            .then( loan_amount => {
+                                menu.session.get('loan_term')
+                                .then( loan_term => { 
+                                const params = {
+                                        loan_product_type: loan_details.loan_product_id,
+                                        loan_category: 'term',
+                                        requested_amount: loan_amount       
+                                      };                                                                    
+                                    get_loan_pre_computation(token,params)
+                                    .then((results) => {                                        
+                                        menu.con(
+                                            `Product: ${loan_details.loan_product_name} `+
+                                            `\nTerm: ${loan_term} Months`+
+                                            `\nAmount: ${loan_amount.toLocaleString('en')} `+  
+                                            `\nCharges: ${results[0].charges.toLocaleString('en')} `+ 
+                                            `\nInterest: ${results[0].interest.toLocaleString('en')} `+                                       
+                                            '\n\n1. Accept'+
+                                            '\n2. Decline'                                            
+                                        ); 
+                                    }).catch(error => {             
+                                        menu.end('Request failed!');
+                                        console.log(error.message);
+                                    });
+                                              
+                                });
+                                             
+                            });
+                                             
+                        });
+                                             
+                    });          
+            });            
+        
+    },
+    next: {
+        '1': 'loan_request_finalize',            
+        '2': 'loans',
+         
+    }
+});
+
 
 //handle loan_request_finalize
 menu.state('loan_request_finalize', {
-    run:  () => {    
+    run:  () => { 
         menu.session.get('bearer_token')
-        .then( token => {
-                menu.con(
-                    'Loan Details Confirmation:'+  
-                    '\nLoan Name : Development'+
-                    '\nLoan Amount: 40,000'+                 
-                    '\nLoan Term: 12 Months'+
-                    '\n\n1. finish'+
-                    '\n0. Back'+
-                    '\n00. Home'
-                );                   
-        });
-    },
-    next: {
-        '*\\d+': 'loan_request_done',            
-        '0': 'Back',
-        '00': 'home',   
-    }
-});
+            .then( token => {
+                menu.session.get('loan_details')
+                .then( loan_details => {
+                    menu.session.get('loan_amount')
+                    .then( loan_amount => {
+                        menu.session.get('loan_term')
+                        .then( loan_term => {                             
+                         const params = {
+                                loan_product: loan_details.loan_product_id,
+                                loan_category: 'term',
+                                requested_amount: parseInt(loan_amount)       
+                                };  
 
-
-//handle loan_request_done
-menu.state('loan_request_done', {
-    run:  () => {    
-        menu.session.get('bearer_token')
-        .then( token => {
-                menu.con(
-                    'Loan Application Completed Successfully!'+
-                    '\n\n1. Check Loan status'+ 
-                    '\n00. Home'                     
-                );                   
-        });
+                            post_loan_request(token,params)
+                            .then((results) => {    
+                                
+                                const msg = (results.length>0) ? `Failed. ${results[0].description} \n\n00. Home` :'Loan Application Successfully! Funds sent to your Mpesa account. Thank you! \n\n1. Check Loan status\n00. Home';
+                                menu.con(
+                                    `${msg}`                                                                     
+                                ); 
+                            }).catch(error => {             
+                                menu.end('Request failed!');
+                                console.log(error.message);
+                            });
+                                        
+                        });
+                                        
+                    });
+                                        
+                });
+                                        
+            });          
+                   
+        
     },
     next: { 
         '1': 'check_loan_status', 
         '00': 'home',     
     }
 });
-
 
 //handle member loan Balances
 menu.state('loan_balances', {
@@ -402,6 +502,16 @@ menu.state('check_loan_status', {
         '00': 'home'   
     }
 });
+
+
+
+
+                
+                
+
+
+
+
 
 //handle loan listing based on categ for loan terms
 menu.state('loan_terms_show_loans', {
