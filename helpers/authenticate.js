@@ -4,6 +4,9 @@ const endpoints  = require('../configs/endpoints');
 
 let authenticate_user = function(phone_number,pin){   
 
+  //remove the + symbol from phone number
+  phone_number = phone_number.substring(1);
+
   //get token for basic authorization
   //const basic_token = Buffer.from(`${phone_number}:${pin}`, "utf8").toString('base64'); 
   
